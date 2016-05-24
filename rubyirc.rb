@@ -25,6 +25,38 @@ MODE #test +o :alisa_000
 require 'socket'
 require 'thread'
 
+class Command
+	def privmsg(target, content, action=false)
+		
+	end
+	
+	def part(channel, message="Leaving")
+		result = "PART #{channel} #{message}"
+		return result
+	end
+	
+	def mode(target, content)
+		#parse the content to process different mode commands
+		#Manage +o,-o, +v, -v, for users
+		#Manage channel modes (explore some popular ones)
+		#Manage +b, -b, it has a special case with hostname
+	end
+	
+	def join(channel)
+		result = "JOIN #{channel}"
+		return result
+	end
+	
+	def kick(channel, nickname,reason=nil)
+		result = "KICK #{channel} #{nickname}"
+		if reason
+			result += (" "+ reason)
+		end
+		return result
+	end
+	
+end
+
 def get_nickname(server_line)
     length = server_line.index("!")
     return server_line[1...length]
@@ -52,7 +84,7 @@ def get_user_info(server_line)
 	return user_info
 end
 
-def parse_message(server_line)
+def parse_incoming_message(server_line)
 	split_line = server_line.split
 	
 	if /\d{1,3}/.match(split_line[1])
@@ -68,7 +100,12 @@ def parse_message(server_line)
 
 	elsif split_line[0]=="PING"
 		server_message= Hash.new
-		server_message = {:message_type => "ping_message"}
+		server_message = {
+			:message_type => "ping_message",
+			:message_content => server_line,				  
+			:message_response => server_line.gsub("PING","PONG")
+		}
+		
 		return server_message
 	elsif split_line[1]=="NOTICE"
 		server_message= Hash.new
@@ -103,7 +140,7 @@ end
 def recieve_data (server_socket)
 	while true
 			server_line = server_socket.gets
-			recieved = parse_message(server_line)
+			recieved = parse_incoming_message(server_line)
 			if recieved[:message_type] == "server_message"
 				puts "#{recieved[:host]} #{recieved[:message_id]} #{recieved[:message_content]}"
 			elsif recieved[:message_type]=="client_message"
@@ -113,8 +150,8 @@ def recieve_data (server_socket)
 
 			if server_line
 				if recieved[:message_type]=="ping_message"
-					server_socket.puts "PONG :"+ server_line[6..-1]
-					puts "PONG :"+ server_line[6..-1]
+					server_socket.puts recieved[:message_response]
+					puts recieved[:message_response]
 				elsif server_line.include?("VERSION")
 					puts "NOTICE IRC : VERSION RubyIRC Test"
 				end
