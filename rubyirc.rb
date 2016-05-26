@@ -27,7 +27,13 @@ require 'thread'
 
 class Command
 	def privmsg(target, content, action=false)
-		
+		result = String.new
+		if action
+			result = "PRIVMSG #{target} #{001.chr}ACTION #{content}#{001.chr}"
+		else
+			result = "PRIVMSG #{target} #{content}"
+		end
+		return result
 	end
 	
 	def part(channel, message="Leaving")
@@ -35,11 +41,16 @@ class Command
 		return result
 	end
 	
-	def mode(target, content)
-		#parse the content to process different mode commands
+	def mode(channel, sign, mode)
 		#Manage +o,-o, +v, -v, for users
 		#Manage channel modes (explore some popular ones)
 		#Manage +b, -b, it has a special case with hostname
+		#output e.g. MODE #test +v testdev
+		#input e.g.: Command.new.mode(channel,"+o nickname")
+		result = "MODE #{channel.strip} #{sign.strip}#{mode.strip}"
+		return result
+					
+	
 	end
 	
 	def join(channel)
@@ -139,27 +150,37 @@ end
 
 def recieve_data (server_socket)
 	while true
-			server_line = server_socket.gets
-			recieved = parse_incoming_message(server_line)
-			if recieved[:message_type] == "server_message"
-				puts "#{recieved[:host]} #{recieved[:message_id]} #{recieved[:message_content]}"
-			elsif recieved[:message_type]=="client_message"
-				puts "#{recieved[:nickname]} : #{recieved[:message_command]} to #{recieved[:message_target]} #{recieved[:message_content]}"
-			else puts server_line
-			end
+		server_line = server_socket.gets
+		recieved = parse_incoming_message(server_line)
+		if recieved[:message_type] == "server_message"
+			puts "#{recieved[:host]} #{recieved[:message_id]} #{recieved[:message_content]}"
+		elsif recieved[:message_type]=="client_message"
+			puts "#{recieved[:nickname]} : #{recieved[:message_command]} to #{recieved[:message_target]} #{recieved[:message_content]}"
+		else puts server_line
+		end
 
-			if server_line
-				if recieved[:message_type]=="ping_message"
-					server_socket.puts recieved[:message_response]
-					puts recieved[:message_response]
-				elsif server_line.include?("VERSION")
-					puts "NOTICE IRC : VERSION RubyIRC Test"
-				end
+		if server_line
+			if recieved[:message_type]=="ping_message"
+				server_socket.puts recieved[:message_response]
+				puts recieved[:message_response]
+			elsif server_line.include?("VERSION")
+				puts "NOTICE IRC : VERSION RubyIRC Test"
 			end
+		end
+
+		if recieved[:message_id]=="376"
+			commandObject = Command.new
+			server_socket.puts(commandObject.join("#rubyirctest"))
+			server_socket.puts(commandObject.privmsg("#rubyirctest","hello wassup"))
+			server_socket.puts(commandObject.privmsg("#rubyirctest","looks around",true))
+			server_socket.puts(commandObject.part("#rubyirctest"))
+		end	
 	end
+	
 end
 
 def send_data (server_socket)
+
 	while true
 		client_line = gets.chomp
 		server_socket.puts(client_line)
@@ -176,4 +197,3 @@ recieve_thread = Thread.new{recieve_data(server_socket)}
 send_thread = Thread.new{send_data(server_socket)}
 send_thread.join
 recieve_thread.join
-
